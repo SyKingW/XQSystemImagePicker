@@ -13,13 +13,18 @@ import MobileCoreServices
 import SVProgressHUD
 import XQAlert
 
+@objc public enum XQSystemPhotoPickerManagerResourceType: Int {
+    /// 全部
+    case all = 0
+    /// 选择图片
+    case image = 1
+    /// 选择视频
+    case video = 2
+}
+
 public class XQSystemPhotoPickerManager: NSObject {
     
-    public enum ResourceType: Int {
-        case all = 0
-        case image = 1
-        case video = 2
-    }
+    
     
     /// imgs 是 UIImage, urls 是视频的URL
     /// 如果是空, 那代表用户什么都不选, 或者点取消
@@ -30,7 +35,7 @@ public class XQSystemPhotoPickerManager: NSObject {
     ///   - selectionLimit: 最多可选多少张( iOS 14 才支持这个属性, iOS14以下，则只可选一张)
     ///   - filter: 选择资源类型
     ///   - callback: 返回已选资源
-    public static func showPicker(with vc: UIViewController, selectionLimit: Int = 1, filter: XQSystemPhotoPickerManager.ResourceType? = .all, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?) {
+    @objc public class func showPicker(with vc: UIViewController, selectionLimit: Int = 1, filter: XQSystemPhotoPickerManagerResourceType = .all, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?) {
         
         if #available(iOS 14, *) {
             
@@ -65,7 +70,7 @@ public class XQSystemPhotoPickerManager: NSObject {
 public class XQSystemUIImagePickerManager: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     
     /// 选择图片
-    public static func showPicker(with vc: UIViewController, filter: XQSystemPhotoPickerManager.ResourceType? = .all, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?) {
+    public static func showPicker(with vc: UIViewController, filter: XQSystemPhotoPickerManagerResourceType? = .all, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?) {
         
         if (!UIImagePickerController.isSourceTypeAvailable(.photoLibrary)) {
             print("不支持打开相册")
