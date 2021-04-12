@@ -271,7 +271,11 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
         for item in results {
 //            print(item.itemProvider, item.itemProvider.registeredTypeIdentifiers)
             
-            if let registeredTypeIdentifier = item.itemProvider.registeredTypeIdentifiers.first, let type = UTType.init(registeredTypeIdentifier) {
+            for registeredTypeIdentifier in item.itemProvider.registeredTypeIdentifiers {
+                // 有部分系统会出现 first 不是 UIType 的问题, 所以这里循环去获取一下
+                guard let type = UTType.init(registeredTypeIdentifier) else {
+                    continue
+                }
                 
                 if type == UTType.image ||
                     type.isSubtype(of: UTType.image) {
@@ -349,6 +353,7 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
                     
                 }
                 
+                break
             }
             
         }
