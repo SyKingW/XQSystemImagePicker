@@ -10,9 +10,6 @@ import UIKit
 import PhotosUI
 import MobileCoreServices
 
-import SVProgressHUD
-import XQAlert
-
 @objc public enum XQSystemPhotoPickerManagerResourceType: Int {
     /// 全部
     case all = 0
@@ -22,20 +19,25 @@ import XQAlert
     case video = 2
 }
 
+/// 根据手机版本，自动判断使用 XQSystemUIImagePickerManager 还是 XQSystemPHPickerManager
 public class XQSystemPhotoPickerManager: NSObject {
     
-    
-    
-    /// imgs 是 UIImage, urls 是视频的URL
+    /// imgs 是 UIImage
+    /// urls 是视频的URL
     /// 如果是空, 那代表用户什么都不选, 或者点取消
     public typealias XQSystemPhotoPickerManagerCallback = (_ imgs: [UIImage], _ urls:[URL] ) -> ()
+    /// 点击取消回调
+    public typealias XQSystemPhotoPickerManagerCancelCallback = () -> ()
     
-    /// 选择图片
+    /// 选择文件
+    ///
+    /// - note: 根据手机版本，自动判断使用 XQSystemUIImagePickerManager 还是 XQSystemPHPickerManager
+    ///
     /// - Parameters:
     ///   - selectionLimit: 最多可选多少张( iOS 14 才支持这个属性, iOS14以下，则只可选一张)
     ///   - filter: 选择资源类型
     ///   - callback: 返回已选资源
-    @objc public class func showPicker(with vc: UIViewController, selectionLimit: Int = 1, filter: XQSystemPhotoPickerManagerResourceType = .all, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?) {
+    @objc public class func showPicker(with vc: UIViewController, selectionLimit: Int = 1, filter: XQSystemPhotoPickerManagerResourceType = .all, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?, cancelCallback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCancelCallback? = nil) {
         
         if #available(iOS 14, *) {
             
@@ -57,24 +59,32 @@ public class XQSystemPhotoPickerManager: NSObject {
                 
             }
             
-            XQSystemPHPickerManager.showPicker(with: vc, selectionLimit: selectionLimit, filter: f, callback: callback)
+            XQSystemPHPickerManager.showPicker(with: vc, selectionLimit: selectionLimit, filter: f, callback: callback, cancelCallback: cancelCallback)
         }else {
-            XQSystemUIImagePickerManager.showPicker(with: vc, filter: filter, callback: callback)
+            XQSystemUIImagePickerManager.showPicker(with: vc, filter: filter, callback: callback, cancelCallback: cancelCallback)
         }
         
-        
+    }
+    
+    /// 退出选择照片
+    public static func dismissPicker(animated flag: Bool = true, completion: (() -> Void)? = nil) {
+        if #available(iOS 14, *) {
+            XQSystemPHPickerManager.dismissPicker(animated: flag, completion: completion)
+        }else {
+            XQSystemUIImagePickerManager.dismissPicker(animated: flag, completion: completion)
+        }
     }
     
 }
 
+/// 很早就一直支持的系统选择图片库，14.0 版本之后，苹果推荐使用 PhotosUI 系统库
 public class XQSystemUIImagePickerManager: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     
     /// 选择图片
-    public static func showPicker(with vc: UIViewController, filter: XQSystemPhotoPickerManagerResourceType? = .all, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?) {
+    public static func showPicker(with vc: UIViewController, filter: XQSystemPhotoPickerManagerResourceType? = .all, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?, cancelCallback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCancelCallback? = nil) {
         
         if (!UIImagePickerController.isSourceTypeAvailable(.photoLibrary)) {
             print("不支持打开相册")
-            //            XQSystemAlert.alert(withTitle: "当前手机不支持相机", message: nil, contentArr: nil, cancelText: "确定", vc: vc, contentCallback: nil, cancelCallback: nil)
             return
         }
         
@@ -84,16 +94,6 @@ public class XQSystemUIImagePickerManager: NSObject, UIImagePickerControllerDele
         
         _systemPhotoPickerManager = XQSystemUIImagePickerManager()
         
-//        let status = AVCaptureDevice.authorizationStatus(for: .video)
-//        if status == .restricted || status == .denied {
-//            XQSystemAlert.alert(withTitle: "提示", message: "相机权限未开启，请进入系统【设置】>【隐私】>【相机】中打开开关，开启相机功能", contentArr: ["前去设置"], cancelText: "取消", vc: vc, contentCallback: { (alert, index) in
-//
-//                UIApplication.shared.open(URL.init(string: UIApplication.openSettingsURLString)!, options: [:], completionHandler: nil)
-//
-//            }, cancelCallback: nil)
-//            return
-//        }
-        
         let imagePickerController = UIImagePickerController()
         imagePickerController.modalPresentationStyle = .fullScreen
                         
@@ -101,7 +101,7 @@ public class XQSystemUIImagePickerManager: NSObject, UIImagePickerControllerDele
         imagePickerController.sourceType = .photoLibrary
         
         // 允许的视屏质量（如果质量选取的质量过高，会自动降低质量）
-//        imagePickerController.videoQuality = .typeMedium
+//        imagePickerController.videoQuality = .typeHigh
         
         var mediaTypes = [String]()
         
@@ -135,14 +135,16 @@ public class XQSystemUIImagePickerManager: NSObject, UIImagePickerControllerDele
         //                imagePickerVC.allowsEditing = YES;
         
         _systemPhotoPickerManager?.callback = callback
+        _systemPhotoPickerManager?.cancelCallback = cancelCallback
         
         vc.present(imagePickerController, animated: true, completion: nil)
         _systemPhotoPickerManager?.imagePickerController = imagePickerController
     }
     
-    public static func hidePicker(animated flag: Bool = true) {
+    /// 退出选择照片
+    public static func dismissPicker(animated flag: Bool = true, completion: (() -> Void)? = nil) {
         if let obj = _systemPhotoPickerManager {
-            obj.imagePickerController?.dismiss(animated: flag, completion: nil)
+            obj.imagePickerController?.dismiss(animated: flag, completion: completion)
             _systemPhotoPickerManager = nil
         }
     }
@@ -150,6 +152,7 @@ public class XQSystemUIImagePickerManager: NSObject, UIImagePickerControllerDele
     private static var _systemPhotoPickerManager: XQSystemUIImagePickerManager?
     
     private var callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?
+    private var cancelCallback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCancelCallback?
     
     private var imagePickerController: UIImagePickerController?
     
@@ -173,27 +176,24 @@ public class XQSystemUIImagePickerManager: NSObject, UIImagePickerControllerDele
             self.callback?(self.imgs, self.urls)
             XQSystemUIImagePickerManager._systemPhotoPickerManager = nil
         }
-        
-        //        [__C.UIImagePickerControllerInfoKey(_rawValue: UIImagePickerControllerMediaType): public.image, __C.UIImagePickerControllerInfoKey(_rawValue: UIImagePickerControllerImageURL): file:///private/var/mobile/Containers/Data/Application/C6D2D065-A742-4577-8B8E-3845E91FF2BE/tmp/20130466-BED4-4F1B-A99B-D5B7AA84F57E.png, __C.UIImagePickerControllerInfoKey(_rawValue: UIImagePickerControllerReferenceURL): assets-library://asset/asset.PNG?id=FE197B0E-82F6-4D01-9E71-0C285B1D3C60&ext=PNG, __C.UIImagePickerControllerInfoKey(_rawValue: UIImagePickerControllerOriginalImage): <UIImage:0x282dde520 anonymous {750, 1334}>]
-                
-        //        imagePickerController(_:didFinishPickingMediaWithInfo:) [__C.UIImagePickerControllerInfoKey(_rawValue: UIImagePickerControllerReferenceURL): assets-library://asset/asset.MP4?id=8000D1E5-0E9A-4646-BEC0-6E629F13A7CA&ext=MP4, __C.UIImagePickerControllerInfoKey(_rawValue: UIImagePickerControllerMediaType): public.movie, __C.UIImagePickerControllerInfoKey(_rawValue: UIImagePickerControllerMediaURL): file:///private/var/mobile/Containers/Data/PluginKitPlugin/A2959739-2844-4B91-B4C5-0F3E079ECEB4/tmp/trim.E220586A-B04D-4003-9552-3B4385D594E1.MOV]
-        
     }
     
     public func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-        print(#function)
+//        print(#function)
         picker.dismiss(animated: true) { [unowned self] in
-            self.callback?(self.imgs, self.urls)
+//            self.callback?(self.imgs, self.urls)
+            self.cancelCallback?()
             XQSystemUIImagePickerManager._systemPhotoPickerManager = nil
         }
     }
     
-    deinit {
-        print(#function)
-    }
+//    deinit {
+//        print(#function)
+//    }
     
 }
 
+/// 14.0 版本之后，苹果推荐使用 PhotosUI 系统库
 @available(iOS 14, *)
 public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
     
@@ -201,7 +201,7 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
     /// - Parameters:
     ///   - selectionLimit: 最大可选多少张. 默认1张, 传 0 则是系统可选的上限
     ///   - filter: 要过滤可选内容. nil 就不过滤
-    public static func showPicker(with vc: UIViewController, selectionLimit: Int = 1, filter: PHPickerFilter? = nil, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?) {
+    public static func showPicker(with vc: UIViewController, selectionLimit: Int = 1, filter: PHPickerFilter? = nil, callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?, cancelCallback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCancelCallback? = nil) {
         
         if let _ = _systemPhotoPickerManager {
             return
@@ -209,6 +209,7 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
         
         _systemPhotoPickerManager = XQSystemPHPickerManager()
         _systemPhotoPickerManager?.callback = callback
+        _systemPhotoPickerManager?.cancelCallback = cancelCallback
         
         //        PHPickerConfiguration.init(photoLibrary: PHPhotoLibrary.shared())
         var config = PHPickerConfiguration.init()
@@ -222,9 +223,30 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
         vc.present(_systemPhotoPickerManager!.pickerViewController!, animated: true, completion: nil)
     }
     
-    public static func hidePicker(animated flag: Bool = true) {
-        if let obj = _systemPhotoPickerManager {
-            obj.pickerViewController?.dismiss(animated: flag, completion: nil)
+    /// 使用 PHPicker 原数据返回
+    public static func presentPicker(with vc: UIViewController, selectionLimit: Int = 1, filter: PHPickerFilter? = nil, callback: XQSystemPhotoPickerManagerCallback?) {
+        if let _ = _systemPhotoPickerManager {
+            return
+        }
+        
+        _systemPhotoPickerManager = XQSystemPHPickerManager()
+        _systemPhotoPickerManager?.resultsCallback = callback
+        
+        var config = PHPickerConfiguration.init()
+        // 可选张数, 默认1张, 传0则系统上限
+        config.selectionLimit = selectionLimit
+        // 可选类型, 默认所有
+        config.filter = filter
+        _systemPhotoPickerManager?.pickerViewController = PHPickerViewController.init(configuration: config)
+        _systemPhotoPickerManager?.pickerViewController?.delegate = _systemPhotoPickerManager
+        _systemPhotoPickerManager?.pickerViewController?.modalPresentationStyle = .fullScreen
+        vc.present(_systemPhotoPickerManager!.pickerViewController!, animated: true, completion: nil)
+    }
+    
+    /// 退出照片选择
+    public static func dismissPicker(animated flag: Bool = true, completion: (() -> Void)? = nil) {
+        if _systemPhotoPickerManager != nil {
+            _systemPhotoPickerManager?.pickerViewController?.dismiss(animated: flag, completion: completion)
             _systemPhotoPickerManager = nil
         }
     }
@@ -233,9 +255,12 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
     
     private var pickerViewController: PHPickerViewController?
     
-    /// imgs 是 UIImage, urls 是视频的URL
-    /// 如果是空, 那代表用户什么都不选, 或者点取消
-    var callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?
+    
+    private var callback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCallback?
+    private var cancelCallback: XQSystemPhotoPickerManager.XQSystemPhotoPickerManagerCancelCallback?
+    
+    public typealias XQSystemPhotoPickerManagerCallback = (_ results: [PHPickerResult]) -> ()
+    private var resultsCallback: XQSystemPhotoPickerManagerCallback?
     
     private var imgs = [UIImage]()
     private var urls = [URL]()
@@ -245,19 +270,27 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
     // MARK: - PHPickerViewControllerDelegate
     
     public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-        print(#function, results)
+//        print(#function, results)
         
-        if results.count == 0 {
-//            print("取消")
-            picker.dismiss(animated: true, completion: nil)
-            XQSystemPHPickerManager._systemPhotoPickerManager = nil
+        if self.resultsCallback != nil {
+            self.resultsCallback?(results)
+            Self.dismissPicker()
             return
         }
         
-        SVProgressHUD.show(withStatus: nil)
+        if results.count == 0 {
+//            print("取消")
+            picker.dismiss(animated: true) { [unowned self] in
+                self.cancelCallback?()
+                XQSystemPHPickerManager._systemPhotoPickerManager = nil
+            }
+            return
+        }
+        
+//        SVProgressHUD.show(withStatus: nil)
         
         // 创建默认文件夹
-        let directoryPath = self.normalDirectoryPath()
+        let directoryPath = Self.normalDirectoryPath()
         if let path = directoryPath {
             if !FileManager.default.fileExists(atPath: path) {
                 let url = URL.init(fileURLWithPath: path)
@@ -314,42 +347,12 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
                     }
                     
                     // 这个能直接获取到数据
-//                    item.itemProvider.loadDataRepresentation(forTypeIdentifier: registeredTypeIdentifier) { (data, error) in
-//                        print("loadDataRepresentation: ", data ?? "没有数据", error ?? "没有错误")
-//                    }
+//                    item.itemProvider.loadDataRepresentation
                     
                     // 获取路径
                     // 测的时候， Could not create a bookmark: NSError: Cocoa 257 "The file couldn’t be opened because you don’t have permission to view it." }
                     // 一直显示没权限...并且拷贝也不行
-                    //                    item.itemProvider.loadItem(forTypeIdentifier: registeredTypeIdentifier, options: nil) { (secureCoding, error) in
-                    //                        print(secureCoding ?? "没有数据", error ?? "没有错误")
-                    //
-                    //                        DispatchQueue.main.async {
-                    //                            if let path = secureCoding as? URL {
-                    //
-                    //                                var url: URL?
-                    //                                if let lp = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true).first {
-                    //
-                    //                                    let p = lp + "/" + "\(Int(Date.init().timeIntervalSince1970)).mp4"
-                    //                                    url = URL.init(fileURLWithPath: p)
-                    //                                    try? FileManager.default.copyItem(at: path, to: url!)
-                    //                                    print("拷贝结束: \(p)")
-                    //
-                    //
-                    //                                }
-                    //
-                    //                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    //                                    if !FileManager.default.fileExists(atPath: url!.absoluteString) {
-                    //                                        print("拷贝失败")
-                    //                                    }else {
-                    //                                        self.player(url!)
-                    //                                    }
-                    //
-                    //                                }
-                    //
-                    //                            }
-                    //                        }
-                    //                    }
+                    //  item.itemProvider.loadItem
                     
                 }
                 
@@ -369,7 +372,7 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
                 self.pickerViewController?.dismiss(animated: true, completion: nil)
                 self.pickerViewController = nil
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                    SVProgressHUD.dismiss()
+//                    SVProgressHUD.dismiss()
                     self.callback?(self.imgs, self.urls)
                     XQSystemPHPickerManager._systemPhotoPickerManager = nil
                 }
@@ -378,7 +381,7 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
     }
     
     /// 获取默认文件夹路径
-    func normalDirectoryPath() -> String? {
+    public static func normalDirectoryPath() -> String? {
         
         if let lp = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true).first {
             return lp + "/" + "XQSystemPhotoPickerManager"
@@ -387,8 +390,8 @@ public class XQSystemPHPickerManager: NSObject, PHPickerViewControllerDelegate {
         return nil
     }
     
-    deinit {
-        print(#function)
-    }
+//    deinit {
+//        print(#function)
+//    }
 
 }

@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
     s.requires_arc = true   #是否必须arc
     
     s.dependency 'SVProgressHUD'
-    s.dependency 'XQAlert'
+#    s.dependency 'XQAlert'
 
 	s.source_files = 'SDK/**/*.{swift}'
   # s.resources = 'SDK/**/*.{strings}'
